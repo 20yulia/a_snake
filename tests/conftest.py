@@ -4,9 +4,9 @@ from multiprocessing import Process
 from pathlib import Path
 from typing import Any
 
-from pygame.time import Clock
 import pytest
 import pytest_timeout  # type: ignore
+from pygame.time import Clock
 
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
 sys.path.append(str(BASE_DIR))
