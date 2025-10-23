@@ -1,5 +1,5 @@
 from random import randint
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple
 
 import pygame
 
@@ -8,6 +8,7 @@ SCREEN_WIDTH, SCREEN_HEIGHT = 640, 480
 GRID_SIZE = 20
 GRID_WIDTH = SCREEN_WIDTH // GRID_SIZE
 GRID_HEIGHT = SCREEN_HEIGHT // GRID_SIZE
+
 # Направления движения:
 UP = (0, -1)
 DOWN = (0, 1)
@@ -56,22 +57,8 @@ class GameObject:
         )
         self.body_color = body_color
 
-    def draw_cell(self, position: Tuple[int, int]) -> None:
-        """
-        Отрисовывает ячейку на указанной позиции.
-
-        Args:
-            position: Позиция для отрисовки (x, y)
-        """
-        if self.body_color is None:
-            return
-        rect = pygame.Rect(position, (GRID_SIZE, GRID_SIZE))
-        pygame.draw.rect(screen, self.body_color, rect)
-        pygame.draw.rect(screen, BORDER_COLOR, rect, 1)
-
     def draw(self) -> None:
         """Абстрактный метод для отрисовки объекта."""
-        pass
 
 
 class Apple(GameObject):
@@ -91,7 +78,11 @@ class Apple(GameObject):
 
     def draw(self) -> None:
         """Отрисовывает яблоко на игровом поле."""
-        self.draw_cell(self.position)
+        if self.body_color is None:
+            return
+        rect = pygame.Rect(self.position, (GRID_SIZE, GRID_SIZE))
+        pygame.draw.rect(screen, self.body_color, rect)
+        pygame.draw.rect(screen, BORDER_COLOR, rect, 1)
 
 
 class Snake(GameObject):
@@ -127,9 +118,9 @@ class Snake(GameObject):
     def move(self) -> None:
         """Перемещает змейку в текущем направлении."""
         head_x, head_y = self.get_head_position()
-        dir_x, dir_y = self.direction
-        new_x = (head_x + (dir_x * GRID_SIZE)) % SCREEN_WIDTH
-        new_y = (head_y + (dir_y * GRID_SIZE)) % SCREEN_HEIGHT
+        direction_x, direction_y = self.direction
+        new_x = (head_x + (direction_x * GRID_SIZE)) % SCREEN_WIDTH
+        new_y = (head_y + (direction_y * GRID_SIZE)) % SCREEN_HEIGHT
         new_position = (new_x, new_y)
 
         if len(self.positions) > 1:
@@ -144,27 +135,28 @@ class Snake(GameObject):
 
     def draw(self) -> None:
         """Отрисовывает змейку на игровом поле."""
-        # Отрисовка всех сегментов змейки
-        for position in self.positions:
-            self.draw_cell(position)
+        if self.body_color is None:
+            return
 
-        # Затирание последнего сегмента если нужно
+        # Отрисовка тела змейки
+        for position in self.positions[:-1]:
+            rect = pygame.Rect(position, (GRID_SIZE, GRID_SIZE))
+            pygame.draw.rect(screen, self.body_color, rect)
+            pygame.draw.rect(screen, BORDER_COLOR, rect, 1)
+
+        # Отрисовка головы змейки
+        if self.positions:
+            head_rect = pygame.Rect(
+                self.get_head_position(),
+                (GRID_SIZE, GRID_SIZE)
+            )
+            pygame.draw.rect(screen, self.body_color, head_rect)
+            pygame.draw.rect(screen, BORDER_COLOR, head_rect, 1)
+
+        # Очистка последней позиции (хвоста)
         if self.last:
             last_rect = pygame.Rect(self.last, (GRID_SIZE, GRID_SIZE))
             pygame.draw.rect(screen, BOARD_BACKGROUND_COLOR, last_rect)
-
-
-# Словарь для обработки поворотов змейки
-TURN_RULES: Dict[Tuple[int, Tuple[int, int]], Tuple[int, int]] = {
-    (pygame.K_UP, LEFT): UP,
-    (pygame.K_UP, RIGHT): UP,
-    (pygame.K_DOWN, LEFT): DOWN,
-    (pygame.K_DOWN, RIGHT): DOWN,
-    (pygame.K_LEFT, UP): LEFT,
-    (pygame.K_LEFT, DOWN): LEFT,
-    (pygame.K_RIGHT, UP): RIGHT,
-    (pygame.K_RIGHT, DOWN): RIGHT,
-}
 
 
 def handle_keys(game_object: Snake) -> None:
@@ -174,13 +166,24 @@ def handle_keys(game_object: Snake) -> None:
     Args:
         game_object: Объект змейки, которым управляет игрок
     """
+    # Словарь для хранения правил поворотов
+    direction_rules = {
+        (pygame.K_UP, RIGHT): UP,
+        (pygame.K_UP, LEFT): UP,
+        (pygame.K_DOWN, RIGHT): DOWN,
+        (pygame.K_DOWN, LEFT): DOWN,
+        (pygame.K_LEFT, UP): LEFT,
+        (pygame.K_LEFT, DOWN): LEFT,
+        (pygame.K_RIGHT, UP): RIGHT,
+        (pygame.K_RIGHT, DOWN): RIGHT}
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             raise SystemExit
         elif event.type == pygame.KEYDOWN:
-            # Используем словарь для определения нового направления
-            new_direction = TURN_RULES.get((event.key, game_object.direction))
+            # Проверяем возможность поворота по словарю
+            key_direction_pair = (event.key, game_object.direction)
+            new_direction = direction_rules.get(key_direction_pair)
             if new_direction:
                 game_object.next_direction = new_direction
 
@@ -207,13 +210,14 @@ def main() -> None:
             while apple.position in snake.positions:
                 apple.randomize_position()
 
-        # Проверка столкновения с собой (начиная со второго сегмента)
+        # Проверка столкновения с телом (начиная со второго сегмента)
         if snake.get_head_position() in snake.positions[1:]:
             snake.reset()
 
         screen.fill(BOARD_BACKGROUND_COLOR)
         apple.draw()
         snake.draw()
+
         pygame.display.update()
 
 
